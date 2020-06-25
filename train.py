@@ -3,7 +3,7 @@ import numpy as np
 import random
 import pandas as pd
 import numpy as np
-from envs.environment_gym import trading_environment
+from environment_gym import trading_environment
 import matplotlib.pyplot as plt
 import keras as ks
 from keras.layers import Dense
