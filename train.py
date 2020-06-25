@@ -3,7 +3,7 @@ import numpy as np
 import random
 import pandas as pd
 import numpy as np
-from environment_gym import trading_environment
+from envs.environment_gym import trading_environment
 import matplotlib.pyplot as plt
 import keras as ks
 from keras.layers import Dense
@@ -12,7 +12,7 @@ import collections
 class DQN:
     def __init__(self, env):
         self.env = env
-        self.pool_size=50
+        self.pool_size=200
         self.learning_rate = 0.01
         self.epsilon = 0.1
         self.batch_size = 32
@@ -23,7 +23,6 @@ class DQN:
         self.target_model = self.model
 
     def build_model(self):
-        print(self.pool_size)
         model = ks.models.Sequential()
         input_size = self.env.observation_space.shape[0] * self.env.windows
         #input_size = 16
@@ -45,8 +44,8 @@ class DQN:
             act = self.env.action_space.sample()
         return act
 
-    def transfer_state_dim(self, state):
-        out = np.reshape(state, [-1, state.shape[0] * state.shape[1]])
+    def transfer_state_dim(self, state):#out put ndarray (1, 80)
+        out = np.reshape(state, [1, state.shape[0] * state.shape[1]])
         return out
 
 
@@ -76,21 +75,24 @@ class DQN:
         return training_samples
 
     def train_batch(self, training_samples):
-        #train_x = []
-        #train_y = []
+        x_train = []
+        y_train = []
         for sample in training_samples:
             state, act, reward, state_next, done = sample
             state = self.transfer_state_dim(state)
-            #train_x.append(state)
+            x_train.append(state)
             state_next = self.transfer_state_dim(state_next)
             target = self.target_model.predict(state)
             if done:
                 target[0][act] = reward
             else:
                 target[0][act] = reward + self.gamma * np.max(self.target_model.predict(state_next))
-            #train_y.append(target)
-
-            self.model.fit(state, target, epochs=1)
+            y_train.append(target)
+        x_train = np.array(x_train)
+        x_train = np.squeeze(x_train)
+        y_train = np.array(y_train)
+        y_train = np.squeeze(y_train)
+        self.model.fit(x_train, y_train, epochs=50, verbose=1)
 
     def update_target_model(self):
         weights = self.model.get_weights()
@@ -118,14 +120,16 @@ def DQN_train():
     env = trading_environment(market_data, windows=windows, initial_cash_balance=initial_cash_balance, initial_bt_balance=initial_bt_balance)
     DQN_agent = DQN(env)
 
-    trails = 10
-    iterations = 100
+    trails = 2
+    iterations = 600
 
     DQN_agent.initial_pool()
     print('initial pool finished')
     for trail in range(trails):
+        print('trail', trail)
         state = env.reset()
         for iteration in range(iterations):
+            print('iteration', iteration)
             act = DQN_agent.epsilon_greedy_action(state)#下一步
             state_next, rewards, done = DQN_agent.save_into_pool(state, act)#save into pool同时做一步step
             training_samples = DQN_agent.sample_from_pool()#sample from pool
@@ -135,6 +139,8 @@ def DQN_train():
             state = state_next
             if done:
                 break
+        DQN_agent.env.render()
+
     DQN_agent.model_save('BTC_DQN')
 
 if __name__=='__main__':
